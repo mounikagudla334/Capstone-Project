@@ -32,6 +32,13 @@ const safeEqual = (a: string, b: string) => {
   return A.length === B.length && timingSafeEqual(A, B)
 }
 
+/** Express 4 does not forward rejected promises to the error handler, so wrap async routes. */
+const wrap =
+  (fn: (req: Request, res: Response) => Promise<unknown>) =>
+  (req: Request, res: Response, next: NextFunction) => {
+    fn(req, res).catch(next)
+  }
+
 export interface AppDeps {
   repo: Repo
   extractor: Extractor
@@ -61,7 +68,9 @@ export function createApp({ repo, extractor, appToken, clientDir }: AppDeps) {
     next()
   })
 
-  app.post('/api/meetings', async (req, res) => {
+  app.post(
+    '/api/meetings',
+    wrap(async (req, res) => {
     const { title, meetingDate, transcript } = req.body ?? {}
     if (typeof transcript !== 'string' || transcript.trim().length < 10)
       throw new HttpError(400, 'TRANSCRIPT_TOO_SHORT', 'Please paste a transcript with at least a sentence or two.')
@@ -73,7 +82,8 @@ export function createApp({ repo, extractor, appToken, clientDir }: AppDeps) {
     const { items, extractedBy } = await extractor.extract(transcript.trim(), date)
     const created = repo.createMeeting({ title: name, meetingDate: date, transcript: transcript.trim(), extractedBy }, items)
     res.status(201).json(created)
-  })
+    }),
+  )
 
   app.get('/api/meetings', (_req, res) => res.json(repo.listMeetings()))
 
