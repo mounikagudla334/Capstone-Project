@@ -1,6 +1,7 @@
 import type { Item, Meeting, Patterns } from './types.ts'
 
 const TOKEN_KEY = 'mno-token'
+const REQUEST_TIMEOUT_MS = 45_000
 const getToken = () => {
   try {
     return sessionStorage.getItem(TOKEN_KEY) ?? ''
@@ -28,17 +29,25 @@ export class UserError extends Error {
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   let res: Response
+  const controller = new AbortController()
+  // Longer than the server's own 30s AI timeout plus one retry, so a slow but valid extraction is not cut off.
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
     res = await fetch(`/api${path}`, {
       ...init,
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
         ...init.headers,
       },
     })
-  } catch {
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError')
+      throw new UserError('This is taking longer than expected. Please try again in a moment.', 'TIMEOUT')
     throw new UserError('We could not reach the server. Check your connection and try again.', 'NETWORK')
+  } finally {
+    clearTimeout(timer)
   }
   if (res.status === 204) return undefined as T
   let body: { error?: string; code?: string } | null = null
