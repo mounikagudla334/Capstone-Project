@@ -1,8 +1,13 @@
-import { DatabaseSync } from 'node:sqlite'
+import { createRequire } from 'node:module'
+import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 
-export function openDb(path: string): DatabaseSync {
+// Vite/Vitest cannot resolve the newer built-in 'node:sqlite' via a static import,
+// so load it at runtime through require.
+const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as typeof import('node:sqlite')
+
+export function openDb(path: string): DatabaseSyncType {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true })
   const db = new DatabaseSync(path)
   db.exec(`
