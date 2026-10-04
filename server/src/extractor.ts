@@ -64,18 +64,26 @@ export function fallbackExtract(transcript: string, meetingDate: string): Extrac
     const speaker = m ? m[1].trim() : null
     const body = (m ? m[2] : line).trim()
     if (!body) continue
+    let lastActionInLine: ExtractedItem | null = null
     for (const sentence of body.split(/(?<=[.!?])\s+/)) {
       const s = sentence.trim()
       if (s.length < 8) continue
       const isAction = ACTION_RE.test(s)
-      items.push({
+      // A short follow-up like "It is urgent." qualifies the action before it; don't make it its own item.
+      if (!isAction && lastActionInLine && HIGH_RE.test(s) && s.split(/\s+/).length <= 5) {
+        lastActionInLine.priority = 'high'
+        continue
+      }
+      const item: ExtractedItem = {
         kind: isAction ? 'action' : 'discussion',
         text: s.slice(0, 300),
         owner: isAction ? speaker : null,
         priority: HIGH_RE.test(s) ? 'high' : LOW_RE.test(s) ? 'low' : 'medium',
         dueDate: isAction ? resolveDueDate(s, meetingDate) : null,
         workType: classifyWorkType(s),
-      })
+      }
+      items.push(item)
+      if (isAction) lastActionInLine = item
     }
   }
   return items

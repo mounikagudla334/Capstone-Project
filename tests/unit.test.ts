@@ -58,6 +58,8 @@ describe('extractor', () => {
     expect(action.kind).toBe('action')
     expect(action.owner).toBe('Asha')
     expect(action.dueDate).toBe('2026-10-09')
+    expect(action.priority).toBe('high')
+    expect(items.some((i) => i.text === 'This is urgent.')).toBe(false)
     expect(items.find((i) => i.text.includes('Dashboard'))!.kind).toBe('discussion')
   })
   it('parses JSON even when the model wraps it in prose', () => {
